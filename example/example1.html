@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta name="viewport" content="width=device-width,height=device-height,user-scalable=no,initial-scale=1,maximum-scale=1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta charset="UTF-8">
+</head>
+
+<body style="background:black">
+
+  <script src="https://rawgit.com/phinajs/phina.js/develop/build/phina.js"></script>
+  <script src="https://rawgit.com/daishihmr/phigl.js/develop/build/phigl.js"></script>
+  <script src="../build/phina.particle2dx.js"></script>
+
+  <script>
+
+  phina.globalize();
+  phina.main(() => {
+
+    const app = GameApp({
+      width: 750,
+      height: 1334,
+      assets: {
+        image: {
+          "emit1Image": "Emit1.png",
+        },
+        json: {
+          "emit1Json": "Emit1.json",
+        },
+      },
+      startLabel: "main",
+    })
+    app.enableStats();
+    app.run();
+
+  });
+
+  phina.define("MainScene", {
+    superClass: "DisplayScene",
+
+    init: function() {
+      this.superInit({
+        width: 750,
+        height: 1334,
+        backgroundColor: "black",
+      });
+
+      const emitter = Emitter({
+        jsonName: "emit1Json",
+        textureName: "emit1Image",
+      });
+      emitter.setPosition(524, 1334 - 278)
+      emitter.addChildTo(this);
+
+      // const p = Particle("emit1Image");
+      // p.setScale(100/32, 100/32);
+      // p.setPosition(emitter.x, emitter.y);
+      // p.addChildTo(this);
+    },
+  });
+
+  </script>
+
+</body>
+
+</html>
