@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width,height=device-height,user-scalable=no,initial-scale=1,maximum-scale=1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta charset="UTF-8">
+</head>
+<body style="background:black">
+
+  <script src="https://rawgit.com/phinajs/phina.js/develop/build/phina.js"></script>
+  <script src="../src/ColoredTexture.js"></script>
+  <script>
+  phina.globalize();
+
+  phina.main(() => {
+    GameApp({
+      startLabel: "main",
+      assets: {
+        image: {
+          "Emit1": "./Emit1.png",
+          "Emit3": "./Emit3.png",
+        }
+      }
+    }).run();
+  });
+
+  phina.define("MainScene", {
+    superClass: "DisplayScene",
+
+    init: function() {
+      this.superInit();
+
+      const tex = ColoredTexture({
+        textureName: "Emit3",
+      });
+      document.body.appendChild(tex.domElement);
+
+      tex.setColor(0.5, 0.8, 1.0, 1.0);
+    }
+  });
+  </script>
+</body>
+</html>

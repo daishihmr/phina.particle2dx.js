@@ -16,18 +16,28 @@
 
   <script>
 
+  // http://particle2dx.com/
+
   phina.globalize();
   phina.main(() => {
 
     const app = GameApp({
+      fps: 30,
       width: 750,
       height: 1334,
       assets: {
         image: {
-          "emit1Image": "Emit1.png",
+          "sample1": "funsui.png",
+          "sample2": "galaxy3.png",
+          "sample3": "katamari.png",
+          "sample4": "me3.png",
         },
         json: {
-          "emit1Json": "Emit1.json",
+          // JSONファイル （Corona SDK用にエクスポートしたもの）
+          "sample1": "funsui.json",
+          "sample2": "galaxy3.json",
+          "sample3": "katamari.json",
+          "sample4": "me3.json",
         },
       },
       startLabel: "main",
@@ -47,17 +57,30 @@
         backgroundColor: "black",
       });
 
+      // パーティクルのエミッター
       const emitter = Emitter({
-        jsonName: "emit1Json",
-        textureName: "emit1Image",
+        jsonName: "sample1",
+        textureName: "sample1",
       });
-      emitter.setPosition(524, 1334 - 278)
+      emitter.setPosition(this.gridX.span(5), this.gridY.span(5))
       emitter.addChildTo(this);
 
-      // const p = Particle("emit1Image");
-      // p.setScale(100/32, 100/32);
-      // p.setPosition(emitter.x, emitter.y);
-      // p.addChildTo(this);
+      // 生成開始
+      emitter.start();
+
+      // 多用は禁物
+      Emitter({ jsonName: "sample2", textureName: "sample2" })
+        .setPosition(this.gridX.span(11), this.gridY.span(5))
+        .addChildTo(this)
+        .start();
+      Emitter({ jsonName: "sample3", textureName: "sample3" })
+        .setPosition(this.gridX.span(5), this.gridY.span(11))
+        .addChildTo(this)
+        .start();
+      Emitter({ jsonName: "sample4", textureName: "sample4" })
+        .setPosition(this.gridX.span(11), this.gridY.span(11))
+        .addChildTo(this)
+        .start();
     },
   });
 

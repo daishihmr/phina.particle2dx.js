@@ -8,6 +8,14 @@ phina.namespace(function() {
   phina.define("phina.particle2dx.Particle", {
     superClass: "phina.display.Sprite",
 
+    emitterType: 0,
+
+    texture: null,
+    r: 1.0,
+    g: 1.0,
+    b: 1.0,
+    a: 1.0,
+
     emitterPosition: null,
     life: 0,
 
@@ -15,11 +23,14 @@ phina.namespace(function() {
     gravity: null,
     radialAccel: null,
     tangentialAccel: 0,
-
     _tangentialAccel: null,
 
-    init: function(textureName) {
-      this.superInit(textureName);
+    posAngle: 0,
+    posRadius: 0,
+    rotPerSec: 0,
+
+    init: function(image) {
+      this.superInit(image);
 
       this.velocity = phina.geom.Vector2();
       this.gravity = phina.geom.Vector2();
@@ -36,19 +47,34 @@ phina.namespace(function() {
     },
 
     update: function(app) {
-      add(this.velocity, this.gravity, app.deltaTime);
-      add(this.velocity, this.radialAccel, app.deltaTime);
+      if (this.emitterType === 0) {
+        add(this.velocity, this.gravity, app.deltaTime);
+        add(this.velocity, this.radialAccel, app.deltaTime);
 
-      if (this.tangentialAccel) {
-        this._tangentialAccel
-          .set(this.x - this.emitterPosition.x, this.y - this.emitterPosition.y)
-          .normalize();
-        this._tangentialAccel.set(-this._tangentialAccel.y, this._tangentialAccel.x);
-        this._tangentialAccel.mul(this.tangentialAccel);
-        add(this.velocity, this._tangentialAccel, app.deltaTime);
+        if (this.tangentialAccel) {
+          this._tangentialAccel
+            .set(this.x - this.emitterPosition.x, this.y - this.emitterPosition.y)
+            .normalize();
+          this._tangentialAccel.set(-this._tangentialAccel.y, this._tangentialAccel.x);
+          this._tangentialAccel.mul(this.tangentialAccel);
+          add(this.velocity, this._tangentialAccel, app.deltaTime);
+        }
+
+        add(this.position, this.velocity, app.deltaTime);
+      } else if (this.emitterType === 1) {
+        this.posAngle -= this.rotPerSec * app.deltaTime / 1000;
+        this.position.set(
+          this.emitterPosition.x + Math.cos(this.posAngle.toRadian()) * this.posRadius,
+          this.emitterPosition.y - Math.sin(this.posAngle.toRadian()) * this.posRadius
+        );
       }
-
-      add(this.position, this.velocity, app.deltaTime);
     },
+
+    draw: function(canvas) {
+      if (this.image.setColor) this.image.setColor(this.r, this.g, this.b);
+      this.superMethod("draw", canvas);
+    },
+
   });
+
 });

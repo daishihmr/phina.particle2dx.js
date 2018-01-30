@@ -1,15 +1,84 @@
+phina.namespace(() => {
+
+  phina.define("phina.particle2dx.ColoredTexture", {
+    superClass: "phina.graphics.Canvas",
+
+    orig: null,
+
+    r: -1,
+    g: -1,
+    b: -1,
+
+    _textureName: null,
+    _domElementBackup: null,
+
+    init: function(options) {
+      this.superInit();
+      this.orig = phina.asset.AssetManager.get("image", options.textureName);
+      this.setSize(this.orig.domElement.width, this.orig.domElement.height);
+
+      this._textureName = options.textureName;
+
+      this._canvasForCache = Array.range(0, 1000).map(() => {
+        return phina.graphics.Canvas().setSize(this.width, this.height);
+      });
+
+      this.setColor(1.0, 1.0, 1.0);
+    },
+
+    setColor: function(r, g, b) {
+      const nr = (~~(r * 256)) * 1;
+      const ng = (~~(g * 256)) * 1;
+      const nb = (~~(b * 256)) * 1;
+
+      if (this.r === nr && this.g === ng && this.b === nb) return;
+
+      this.r = nr;
+      this.g = ng;
+      this.b = nb;
+
+      const key = "{_textureName},{r},{g},{b}".format(this);
+      const cache = phina.particle2dx.ColoredTexture._cache;
+      if (cache[key]) {
+        if (!this._domElementBackup) this._domElementBackup = this.domElement;
+        this.domElement = cache[key].domElement;
+      } else {
+        if (this._domElementBackup) this.domElement = this._domElementBackup;
+
+        const ctx = this.context;
+        ctx.clearRect(0, 0, this.width, this.height);
+        ctx.globalCompositeOperation = "source-over";
+        ctx.drawImage(this.orig.domElement, 0, 0);
+        ctx.globalCompositeOperation = "source-in";
+        ctx.fillStyle = "rgb({r},{g},{b})".format(this);
+        ctx.fillRect(0, 0, this.width, this.height);
+
+        const clone = this._canvasForCache.length ? this._canvasForCache.shift() : phina.graphics.Canvas().setSize(this.width, this.height);
+        clone.context.drawImage(this.domElement, 0, 0);
+        cache[key] = clone;
+      }
+    },
+
+    _static: {
+      _cache: {},
+    },
+
+  });
+
+});
 phina.namespace(function() {
 
   phina.define("phina.particle2dx.Emitter", {
     superClass: "phina.app.Object2D",
 
+    active: false,
     random: null,
-    time: 0,
+
     particles: null,
     texture: null,
 
     emitCount: 0,
-    emitPerMillisecond: 0,
+    emitPerMillisec: 0,
 
     init: function(options) {
       this.superInit(options);
@@ -20,13 +89,19 @@ phina.namespace(function() {
       this._initProperties(options);
       this._initParticles(options);
 
-      this.emitPerMillisecond = (this.maxParticles / this.particleLifespan) / 1000;
+      this.emitPerMillisec = this.maxParticles / (this.particleLifespan * 1000);
     },
 
     _initProperties: function(options) {
       var json = phina.asset.AssetManager.get("json", options.jsonName).data;
 
       this.duration = json.duration;
+
+      // 0:Gravity 1:Radius
+      this.emitterType = json.emitterType;
+
+      // this.configName = json.configName;
+
       this.particleLifespan = json.particleLifespan;
       this.particleLifespanVariance = json.particleLifespanVariance;
       this.maxParticles = json.maxParticles;
@@ -47,34 +122,31 @@ phina.namespace(function() {
       this.tangentialAcceleration = json.tangentialAcceleration;
       this.tangentialAccelVariance = json.tangentialAccelVariance;
 
-      // this.configName = json.configName;
+      this.maxRadius = json.maxRadius;
+      this.maxRadiusVariance = json.maxRadiusVariance;
+      this.minRadius = json.minRadius;
+      this.minRadiusVariance = json.minRadiusVariance;
+      this.rotatePerSecond = json.rotatePerSecond;
+      this.rotatePerSecondVariance = json.rotatePerSecondVariance;
 
-      // this.emitterType = json.emitterType;
-
-      // this.maxRadius = json.maxRadius;
-      // this.maxRadiusVariance = json.maxRadiusVariance;
-      // this.minRadius = json.minRadius;
-      // this.minRadiusVariance = json.minRadiusVariance;
-      // this.rotatePerSecond = json.rotatePerSecond;
-      // this.rotatePerSecondVariance = json.rotatePerSecondVariance;
-
-      // 1: additive 771: normal
+      // 1:additive 771:normal
       this.blendFuncDestination = json.blendFuncDestination;
-
       // 770固定
       this.blendFuncSource = json.blendFuncSource;
 
-      // pixel
       this.startParticleSize = json.startParticleSize;
       this.startParticleSizeVariance = json.startParticleSizeVariance;
-
-      this.finishParticleSize = json.finishParticleSize;
+      if (json.finishParticleSize == -1) {
+        this.finishParticleSize = this.startParticleSize;
+      } else {
+        this.finishParticleSize = json.finishParticleSize;
+      }
       this.finishParticleSizeVariance = json.finishParticleSizeVariance;
       this.rotationStart = json.rotationStart;
       this.rotationStartVariance = json.rotationStartVariance;
       this.rotationEnd = json.rotationEnd;
       this.rotationEndVariance = json.rotationEndVariance;
- 
+
       this.startColorRed = json.startColorRed;
       this.startColorGreen = json.startColorGreen;
       this.startColorBlue = json.startColorBlue;
@@ -95,78 +167,155 @@ phina.namespace(function() {
       // this.textureFileName = json.textureFileName;
       // this.textureImageData = json.textureImageData;
       // this.yCoordFlipped = json.yCoordFlipped;
-
-      this.textureName = options.textureName;
     },
 
     _initParticles: function(options) {
-      this.particles = Array.range(0, this.maxParticles).map((index) => {
-        return this._createParticle(index);
+      const texture = phina.particle2dx.ColoredTexture({
+        textureName: options.textureName,
       });
+      // なぜか全然足りないから２倍作っとく
+      this.particles = Array.range(0, this.maxParticles * 2).map(() => this._createParticle(texture));
     },
 
-    _createParticle: function() {
-      const particle = phina.particle2dx.Particle(this.textureName);
+    _createParticle: function(texture) {
+      const particle = phina.particle2dx.Particle(texture);
       if (this.blendFuncDestination === 1) {
         particle.blendMode = "lighter";
       }
       return particle;
     },
 
+    start: function() {
+      this.active = true;
+      if (this.duration > 0) {
+        this.tweener
+          .clear()
+          .wait(this.duration * 1000)
+          .set({ active: false });
+      }
+
+      return this;
+    },
+
+    stop: function() {
+      this.active = false;
+
+      return this;
+    },
+
     update: function(app) {
-      this.emitCount += this.emitPerMillisecond * app.deltaTime;
-      for (let i = 0; i < this.emitCount; i++) {
+      if (!this.active) return;
+
+      this.emitCount += this.emitPerMillisec * app.deltaTime;
+      for (let i = 0; i < ~~this.emitCount; i++) {
         this.emit();
       }
-      this.emitCount -= Math.floor(this.emitCount);
+      this.emitCount -= ~~(this.emitCount);
     },
 
     emit: function() {
       const particle = this.particles.shift();
-      if (!particle) return;
+      if (!particle) {
+        console.warn("たりない");
+        return;
+      }
 
       const r = this.random;
 
       particle.life = this.particleLifespan + r.randfloat(-this.particleLifespanVariance, this.particleLifespanVariance);
-
-      particle.x = this.x + r.randfloat(-this.sourcePositionVariancex, this.sourcePositionVariancex);
-      particle.y = this.y + r.randfloat(-this.sourcePositionVariancey, this.sourcePositionVariancey);
-
-      const angle = this.angle + r.randfloat(-this.angleVariance, this.angleVariance);
-      const speed = this.speed + r.randfloat(-this.speedVariance, this.speedVariance);
-
-      particle.velocity.set(Math.cos(angle.toRadian()) * speed, -Math.sin(angle.toRadian()) * speed);
-      particle.gravity.set(this.gravityx, this.gravityy);
+      particle.emitterType = this.emitterType;
       particle.emitterPosition.set(this.x, this.y);
-      particle.initRadialAccel(this.radialAcceleration + r.randfloat(-this.radialAccelVariance, this.radialAccelVariance));
-      particle.tangentialAccel = this.tangentialAcceleration + r.randfloat(-this.tangentialAccelVariance, this.tangentialAccelVariance);
 
       const sizeFrom = this.startParticleSize + r.randfloat(-this.startParticleSizeVariance, this.startParticleSizeVariance);
       const sizeTo = this.finishParticleSize + r.randfloat(-this.finishParticleSizeVariance, this.finishParticleSizeVariance);
       const rotationFrom = this.rotationStart + r.randfloat(-this.rotationStartVariance, this.rotationStartVariance);
       const rotationTo = this.rotationEnd + r.randfloat(-this.rotationEndVariance, this.rotationEndVariance);
-      const alphaFrom = this.startColorAlpha + r.randfloat(-this.startColorVarianceAlpha, this.startColorVarianceAlpha);
-      const alphaTo = this.finishColorAlpha + r.randfloat(-this.finishColorVarianceAlpha, this.finishColorVarianceAlpha);
 
-      particle.tweener
-        .clear()
-        .set({
+      const rFrom = this.startColorRed + r.randfloat(-this.startColorVarianceRed, this.startColorVarianceRed);
+      const rTo = this.finishColorRed + r.randfloat(-this.finishColorVarianceRed, this.finishColorVarianceRed);
+      const gFrom = this.startColorGreen + r.randfloat(-this.startColorVarianceGreen, this.startColorVarianceGreen);
+      const gTo = this.finishColorGreen + r.randfloat(-this.finishColorVarianceGreen, this.finishColorVarianceGreen);
+      const bFrom = this.startColorBlue + r.randfloat(-this.startColorVarianceBlue, this.startColorVarianceBlue);
+      const bTo = this.finishColorBlue + r.randfloat(-this.finishColorVarianceBlue, this.finishColorVarianceBlue);
+      const aFrom = this.startColorAlpha + r.randfloat(-this.startColorVarianceAlpha, this.startColorVarianceAlpha);
+      const aTo = this.finishColorAlpha + r.randfloat(-this.finishColorVarianceAlpha, this.finishColorVarianceAlpha);
+
+      if (this.emitterType === 0) {
+
+        particle.x = this.x + r.randfloat(-this.sourcePositionVariancex, this.sourcePositionVariancex);
+        particle.y = this.y + r.randfloat(-this.sourcePositionVariancey, this.sourcePositionVariancey);
+
+        const angle = this.angle + r.randfloat(-this.angleVariance, this.angleVariance);
+        const speed = this.speed + r.randfloat(-this.speedVariance, this.speedVariance);
+
+        particle.velocity.set(Math.cos(angle.toRadian()) * speed, -Math.sin(angle.toRadian()) * speed);
+        particle.gravity.set(this.gravityx, this.gravityy);
+        particle.initRadialAccel(this.radialAcceleration + r.randfloat(-this.radialAccelVariance, this.radialAccelVariance));
+        particle.tangentialAccel = this.tangentialAcceleration + r.randfloat(-this.tangentialAccelVariance, this.tangentialAccelVariance);
+
+        particle.$extend({
           scaleX: sizeFrom / particle.width,
           scaleY: sizeFrom / particle.height,
           rotation: rotationFrom,
-          alpha: alphaFrom,
-        })
-        .to({
-          scaleX: sizeTo / particle.width,
-          scaleY: sizeTo / particle.height,
-          rotation: rotationTo,
-          alpha: alphaTo,
-        }, particle.life * 1000)
-        .call(() => {
-          particle.remove();
-          this.particles.push(particle);
+          r: rFrom,
+          g: gFrom,
+          b: bFrom,
+          alpha: aFrom,
         });
 
+        particle.tweener
+          .clear()
+          .to({
+            scaleX: sizeTo / particle.width,
+            scaleY: sizeTo / particle.height,
+            rotation: rotationTo,
+            r: rTo,
+            g: gTo,
+            b: bTo,
+            alpha: aTo,
+          }, particle.life * 1000)
+          .call(() => {
+            particle.remove();
+            this.particles.push(particle);
+          });
+      } else if (this.emitterType === 1) {
+
+        particle.posAngle = this.angle + r.randfloat(-this.angleVariance, this.angleVariance);
+
+        const radiusFrom = this.maxRadius + r.randfloat(-this.maxRadiusVariance, this.maxRadiusVariance);
+        const radiusTo = this.minRadius + r.randfloat(-this.minRadiusVariance, this.minRadiusVariance);
+        particle.rotPerSec = this.rotatePerSecond + r.randfloat(-this.rotatePerSecondVariance, this.rotatePerSecondVariance);
+
+        particle.$extend({
+          scaleX: sizeFrom / particle.width,
+          scaleY: sizeFrom / particle.height,
+          rotation: rotationFrom,
+          r: rFrom,
+          g: gFrom,
+          b: bFrom,
+          alpha: aFrom,
+          posRadius: radiusFrom,
+        });
+
+        particle.tweener
+          .clear()
+          .to({
+            scaleX: sizeTo / particle.width,
+            scaleY: sizeTo / particle.height,
+            rotation: rotationTo,
+            r: rTo,
+            g: gTo,
+            b: bTo,
+            alpha: aTo,
+            posRadius: radiusTo,
+          }, particle.life * 1000)
+          .call(() => {
+            particle.remove();
+            this.particles.push(particle);
+          });
+      }
+
+      particle.update({ deltaTime: 0 });
       particle.addChildTo(this.parent);
     },
 
@@ -342,6 +491,14 @@ phina.namespace(function() {
   phina.define("phina.particle2dx.Particle", {
     superClass: "phina.display.Sprite",
 
+    emitterType: 0,
+
+    texture: null,
+    r: 1.0,
+    g: 1.0,
+    b: 1.0,
+    a: 1.0,
+
     emitterPosition: null,
     life: 0,
 
@@ -349,11 +506,14 @@ phina.namespace(function() {
     gravity: null,
     radialAccel: null,
     tangentialAccel: 0,
-
     _tangentialAccel: null,
 
-    init: function(textureName) {
-      this.superInit(textureName);
+    posAngle: 0,
+    posRadius: 0,
+    rotPerSec: 0,
+
+    init: function(image) {
+      this.superInit(image);
 
       this.velocity = phina.geom.Vector2();
       this.gravity = phina.geom.Vector2();
@@ -370,21 +530,36 @@ phina.namespace(function() {
     },
 
     update: function(app) {
-      add(this.velocity, this.gravity, app.deltaTime);
-      add(this.velocity, this.radialAccel, app.deltaTime);
+      if (this.emitterType === 0) {
+        add(this.velocity, this.gravity, app.deltaTime);
+        add(this.velocity, this.radialAccel, app.deltaTime);
 
-      if (this.tangentialAccel) {
-        this._tangentialAccel
-          .set(this.x - this.emitterPosition.x, this.y - this.emitterPosition.y)
-          .normalize();
-        this._tangentialAccel.set(-this._tangentialAccel.y, this._tangentialAccel.x);
-        this._tangentialAccel.mul(this.tangentialAccel);
-        add(this.velocity, this._tangentialAccel, app.deltaTime);
+        if (this.tangentialAccel) {
+          this._tangentialAccel
+            .set(this.x - this.emitterPosition.x, this.y - this.emitterPosition.y)
+            .normalize();
+          this._tangentialAccel.set(-this._tangentialAccel.y, this._tangentialAccel.x);
+          this._tangentialAccel.mul(this.tangentialAccel);
+          add(this.velocity, this._tangentialAccel, app.deltaTime);
+        }
+
+        add(this.position, this.velocity, app.deltaTime);
+      } else if (this.emitterType === 1) {
+        this.posAngle -= this.rotPerSec * app.deltaTime / 1000;
+        this.position.set(
+          this.emitterPosition.x + Math.cos(this.posAngle.toRadian()) * this.posRadius,
+          this.emitterPosition.y - Math.sin(this.posAngle.toRadian()) * this.posRadius
+        );
       }
-
-      add(this.position, this.velocity, app.deltaTime);
     },
+
+    draw: function(canvas) {
+      if (this.image.setColor) this.image.setColor(this.r, this.g, this.b);
+      this.superMethod("draw", canvas);
+    },
+
   });
+
 });
 phina.namespace(function() {
 
