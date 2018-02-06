@@ -1,4 +1,4 @@
-phina.namespace(() => {
+phina.namespace(function() {
 
   phina.define("phina.particle2dx.ColoredTexture", {
     superClass: "phina.graphics.Canvas",
@@ -19,9 +19,9 @@ phina.namespace(() => {
 
       this._textureName = options.textureName;
 
-      this._canvasForCache = Array.range(0, 1000).map(() => {
+      this._canvasForCache = Array.range(0, 1000).map(function() {
         return phina.graphics.Canvas().setSize(this.width, this.height);
-      });
+      }.bind(this));
 
       this.setColor(1.0, 1.0, 1.0);
     },

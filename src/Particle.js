@@ -1,16 +1,10 @@
 phina.namespace(function() {
 
-  const add = (vec1, vec2, deltaTime) => {
-    vec1.x += vec2.x * deltaTime / 1000;
-    vec1.y -= vec2.y * deltaTime / 1000;
-  };
-
   phina.define("phina.particle2dx.Particle", {
-    superClass: "phina.display.Sprite",
+    superClass: "phina.accessory.Accessory",
 
     emitterType: 0,
 
-    texture: null,
     r: 1.0,
     g: 1.0,
     b: 1.0,
@@ -19,6 +13,7 @@ phina.namespace(function() {
     emitterPosition: null,
     life: 0,
 
+    position: null,
     velocity: null,
     gravity: null,
     radialAccel: null,
@@ -26,12 +21,12 @@ phina.namespace(function() {
     _tangentialAccel: null,
 
     posAngle: 0,
-    posRadius: 0,
     rotPerSec: 0,
 
-    init: function(image) {
-      this.superInit(image);
+    init: function() {
+      this.superInit();
 
+      this.position = phina.geom.Vector2();
       this.velocity = phina.geom.Vector2();
       this.gravity = phina.geom.Vector2();
       this.radialAccel = phina.geom.Vector2();
@@ -41,40 +36,100 @@ phina.namespace(function() {
 
     initRadialAccel: function(radialAccelLength) {
       this.radialAccel
-        .set(this.x - this.emitterPosition.x, this.y - this.emitterPosition.y)
+        .set(this.position.x - this.emitterPosition.x, this.position.y - this.emitterPosition.y)
         .normalize()
         .mul(radialAccelLength);
     },
 
-    update: function(app) {
+    set: function(data) {
+      var duration = this.life * 1000;
+      var p = this.target;
+      p.visible = true;
       if (this.emitterType === 0) {
-        add(this.velocity, this.gravity, app.deltaTime);
-        add(this.velocity, this.radialAccel, app.deltaTime);
-
-        if (this.tangentialAccel) {
-          this._tangentialAccel
-            .set(this.x - this.emitterPosition.x, this.y - this.emitterPosition.y)
-            .normalize();
-          this._tangentialAccel.set(-this._tangentialAccel.y, this._tangentialAccel.x);
-          this._tangentialAccel.mul(this.tangentialAccel);
-          add(this.velocity, this._tangentialAccel, app.deltaTime);
-        }
-
-        add(this.position, this.velocity, app.deltaTime);
+        p.$extend({
+          scale: data.sizeFrom,
+          rotation: data.rotationFrom,
+          r: data.rFrom,
+          g: data.gFrom,
+          b: data.bFrom,
+          a: data.aFrom,
+        });
+        p.tweener
+          .clear()
+          .to({
+            scale: data.sizeTo,
+            rotation: data.rotationTo,
+            r: data.rTo,
+            g: data.gTo,
+            b: data.bTo,
+            a: data.aTo,
+          }, duration)
+          .call(function() {
+            p.remove();
+          });
       } else if (this.emitterType === 1) {
-        this.posAngle -= this.rotPerSec * app.deltaTime / 1000;
-        this.position.set(
-          this.emitterPosition.x + Math.cos(this.posAngle.toRadian()) * this.posRadius,
-          this.emitterPosition.y - Math.sin(this.posAngle.toRadian()) * this.posRadius
-        );
+        p.$extend({
+          scale: data.sizeFrom,
+          rotation: data.rotationFrom,
+          r: data.rFrom,
+          g: data.gFrom,
+          b: data.bFrom,
+          a: data.aFrom,
+          posRadius: data.radiusFrom,
+        });
+        p.tweener
+          .clear()
+          .to({
+            scale: data.sizeTo,
+            rotation: data.rotationTo,
+            r: data.rTo,
+            g: data.gTo,
+            b: data.bTo,
+            a: data.aTo,
+            posRadius: data.radiusTo,
+          }, duration)
+          .call(function() {
+            p.remove();
+          });
       }
     },
 
-    draw: function(canvas) {
-      if (this.image.setColor) this.image.setColor(this.r, this.g, this.b);
-      this.superMethod("draw", canvas);
+    update: function(app) {
+      var deltaSec = app.deltaTime * 0.001;
+
+      if (this.emitterType === 0) {
+        add(this.velocity, this.gravity, deltaSec);
+        add(this.velocity, this.radialAccel, deltaSec);
+
+        if (this.tangentialAccel) {
+          this._tangentialAccel
+            .set(this.position.x - this.emitterPosition.x, this.position.y - this.emitterPosition.y);
+
+          this._tangentialAccel
+            .set(-this._tangentialAccel.y, this._tangentialAccel.x) // 90度回す
+            .normalize()
+            .mul(this.tangentialAccel);
+          add(this.velocity, this._tangentialAccel, deltaSec);
+        }
+
+        add(this.position, this.velocity, deltaSec);
+      } else if (this.emitterType === 1) {
+        this.posAngle -= this.rotPerSec * deltaSec;
+        this.position.set(
+          this.emitterPosition.x + Math.cos(this.posAngle) * this.target.posRadius,
+          this.emitterPosition.y - Math.sin(this.posAngle) * this.target.posRadius
+        );
+      }
+
+      this.target.x = this.position.x;
+      this.target.y = this.position.y;
     },
 
   });
+
+  var add = function(vec1, vec2, deltaSec) {
+    vec1.x += vec2.x * deltaSec;
+    vec1.y -= vec2.y * deltaSec;
+  };
 
 });

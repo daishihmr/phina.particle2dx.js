@@ -7,7 +7,6 @@ phina.namespace(function() {
     random: null,
 
     particles: null,
-    texture: null,
 
     emitCount: 0,
     emitPerMillisec: 0,
@@ -36,7 +35,7 @@ phina.namespace(function() {
 
       this.particleLifespan = json.particleLifespan;
       this.particleLifespanVariance = json.particleLifespanVariance;
-      this.maxParticles = json.maxParticles;
+      this.maxParticles = json.maxParticles; // なぜか全然足りないから２倍作っとく
       this.angle = json.angle;
       this.angleVariance = json.angleVariance;
       this.speed = json.speed;
@@ -102,19 +101,23 @@ phina.namespace(function() {
     },
 
     _initParticles: function(options) {
-      const texture = phina.particle2dx.ColoredTexture({
-        textureName: options.textureName,
-      });
-      // なぜか全然足りないから２倍作っとく
-      this.particles = Array.range(0, this.maxParticles * 2).map(() => this._createParticle(texture));
+      this.particles = Array.range(0, this.maxParticles)
+        .map(function(index) {
+          var p = this._createParticle(options.textureName, index);
+          p.on("removed", function() {
+            p.visible = false;
+            this.particles.push(p);
+          }.bind(this));
+          return p;
+        }.bind(this));
     },
 
-    _createParticle: function(texture) {
-      const particle = phina.particle2dx.Particle(texture);
-      if (this.blendFuncDestination === 1) {
-        particle.blendMode = "lighter";
-      }
-      return particle;
+    _createParticle: function(textureName, index) {
+      throw "no impl";
+    },
+
+    _createParticleAccessory: function() {
+      return phina.particle2dx.Particle();
     },
 
     start: function() {
@@ -131,7 +134,6 @@ phina.namespace(function() {
 
     stop: function() {
       this.active = false;
-
       return this;
     },
 
@@ -139,116 +141,96 @@ phina.namespace(function() {
       if (!this.active) return;
 
       this.emitCount += this.emitPerMillisec * app.deltaTime;
-      for (let i = 0; i < ~~this.emitCount; i++) {
+      for (var i = 0; i < ~~this.emitCount; i++) {
         this.emit();
       }
       this.emitCount -= ~~(this.emitCount);
     },
 
     emit: function() {
-      const particle = this.particles.shift();
-      if (!particle) {
-        console.warn("たりない");
+      var p = this.particles.shift();
+      if (!p) {
+        // console.warn("たりない");
         return;
       }
+      p.addChildTo(this.parent);
 
-      const r = this.random;
+      var r = this.random;
+      var particle = p.particle;
 
       particle.life = this.particleLifespan + r.randfloat(-this.particleLifespanVariance, this.particleLifespanVariance);
       particle.emitterType = this.emitterType;
       particle.emitterPosition.set(this.x, this.y);
 
-      const sizeFrom = this.startParticleSize + r.randfloat(-this.startParticleSizeVariance, this.startParticleSizeVariance);
-      const sizeTo = this.finishParticleSize + r.randfloat(-this.finishParticleSizeVariance, this.finishParticleSizeVariance);
-      const rotationFrom = this.rotationStart + r.randfloat(-this.rotationStartVariance, this.rotationStartVariance);
-      const rotationTo = this.rotationEnd + r.randfloat(-this.rotationEndVariance, this.rotationEndVariance);
+      var sizeFrom = this.startParticleSize + r.randfloat(-this.startParticleSizeVariance, this.startParticleSizeVariance);
+      var sizeTo = this.finishParticleSize + r.randfloat(-this.finishParticleSizeVariance, this.finishParticleSizeVariance);
+      var rotationFrom = this.rotationStart + r.randfloat(-this.rotationStartVariance, this.rotationStartVariance);
+      var rotationTo = this.rotationEnd + r.randfloat(-this.rotationEndVariance, this.rotationEndVariance);
 
-      const rFrom = this.startColorRed + r.randfloat(-this.startColorVarianceRed, this.startColorVarianceRed);
-      const rTo = this.finishColorRed + r.randfloat(-this.finishColorVarianceRed, this.finishColorVarianceRed);
-      const gFrom = this.startColorGreen + r.randfloat(-this.startColorVarianceGreen, this.startColorVarianceGreen);
-      const gTo = this.finishColorGreen + r.randfloat(-this.finishColorVarianceGreen, this.finishColorVarianceGreen);
-      const bFrom = this.startColorBlue + r.randfloat(-this.startColorVarianceBlue, this.startColorVarianceBlue);
-      const bTo = this.finishColorBlue + r.randfloat(-this.finishColorVarianceBlue, this.finishColorVarianceBlue);
-      const aFrom = this.startColorAlpha + r.randfloat(-this.startColorVarianceAlpha, this.startColorVarianceAlpha);
-      const aTo = this.finishColorAlpha + r.randfloat(-this.finishColorVarianceAlpha, this.finishColorVarianceAlpha);
+      var rFrom = this.startColorRed + r.randfloat(-this.startColorVarianceRed, this.startColorVarianceRed);
+      var rTo = this.finishColorRed + r.randfloat(-this.finishColorVarianceRed, this.finishColorVarianceRed);
+      var gFrom = this.startColorGreen + r.randfloat(-this.startColorVarianceGreen, this.startColorVarianceGreen);
+      var gTo = this.finishColorGreen + r.randfloat(-this.finishColorVarianceGreen, this.finishColorVarianceGreen);
+      var bFrom = this.startColorBlue + r.randfloat(-this.startColorVarianceBlue, this.startColorVarianceBlue);
+      var bTo = this.finishColorBlue + r.randfloat(-this.finishColorVarianceBlue, this.finishColorVarianceBlue);
+      var aFrom = this.startColorAlpha + r.randfloat(-this.startColorVarianceAlpha, this.startColorVarianceAlpha);
+      var aTo = this.finishColorAlpha + r.randfloat(-this.finishColorVarianceAlpha, this.finishColorVarianceAlpha);
 
       if (this.emitterType === 0) {
 
-        particle.x = this.x + r.randfloat(-this.sourcePositionVariancex, this.sourcePositionVariancex);
-        particle.y = this.y + r.randfloat(-this.sourcePositionVariancey, this.sourcePositionVariancey);
+        particle.position.x = this.x + r.randfloat(-this.sourcePositionVariancex, this.sourcePositionVariancex);
+        particle.position.y = this.y + r.randfloat(-this.sourcePositionVariancey, this.sourcePositionVariancey);
 
-        const angle = this.angle + r.randfloat(-this.angleVariance, this.angleVariance);
-        const speed = this.speed + r.randfloat(-this.speedVariance, this.speedVariance);
+        var angle = (this.angle + r.randfloat(-this.angleVariance, this.angleVariance)).toRadian();
+        var speed = this.speed + r.randfloat(-this.speedVariance, this.speedVariance);
 
-        particle.velocity.set(Math.cos(angle.toRadian()) * speed, -Math.sin(angle.toRadian()) * speed);
+        particle.velocity.set(Math.cos(angle) * speed, -Math.sin(angle) * speed);
         particle.gravity.set(this.gravityx, this.gravityy);
         particle.initRadialAccel(this.radialAcceleration + r.randfloat(-this.radialAccelVariance, this.radialAccelVariance));
         particle.tangentialAccel = this.tangentialAcceleration + r.randfloat(-this.tangentialAccelVariance, this.tangentialAccelVariance);
 
-        particle.$extend({
-          scaleX: sizeFrom / particle.width,
-          scaleY: sizeFrom / particle.height,
-          rotation: rotationFrom,
-          r: rFrom,
-          g: gFrom,
-          b: bFrom,
-          alpha: aFrom,
+        particle.set({
+          sizeFrom: sizeFrom,
+          sizeTo: sizeTo,
+          rotationFrom: rotationFrom,
+          rotationTo: rotationTo,
+          rFrom: rFrom,
+          rTo: rTo,
+          gFrom: gFrom,
+          gTo: gTo,
+          bFrom: bFrom,
+          bTo: bTo,
+          aFrom: aFrom,
+          aTo: aTo,
         });
 
-        particle.tweener
-          .clear()
-          .to({
-            scaleX: sizeTo / particle.width,
-            scaleY: sizeTo / particle.height,
-            rotation: rotationTo,
-            r: rTo,
-            g: gTo,
-            b: bTo,
-            alpha: aTo,
-          }, particle.life * 1000)
-          .call(() => {
-            particle.remove();
-            this.particles.push(particle);
-          });
       } else if (this.emitterType === 1) {
 
         particle.posAngle = this.angle + r.randfloat(-this.angleVariance, this.angleVariance);
 
-        const radiusFrom = this.maxRadius + r.randfloat(-this.maxRadiusVariance, this.maxRadiusVariance);
-        const radiusTo = this.minRadius + r.randfloat(-this.minRadiusVariance, this.minRadiusVariance);
-        particle.rotPerSec = this.rotatePerSecond + r.randfloat(-this.rotatePerSecondVariance, this.rotatePerSecondVariance);
+        var radiusFrom = this.maxRadius + r.randfloat(-this.maxRadiusVariance, this.maxRadiusVariance);
+        var radiusTo = this.minRadius + r.randfloat(-this.minRadiusVariance, this.minRadiusVariance);
+        particle.rotPerSec = (this.rotatePerSecond + r.randfloat(-this.rotatePerSecondVariance, this.rotatePerSecondVariance)).toRadian();
 
-        particle.$extend({
-          scaleX: sizeFrom / particle.width,
-          scaleY: sizeFrom / particle.height,
-          rotation: rotationFrom,
-          r: rFrom,
-          g: gFrom,
-          b: bFrom,
-          alpha: aFrom,
-          posRadius: radiusFrom,
+        particle.set({
+          sizeFrom: sizeFrom,
+          sizeTo: sizeTo,
+          rotationFrom: rotationFrom,
+          rotationTo: rotationTo,
+          rFrom: rFrom,
+          rTo: rTo,
+          gFrom: gFrom,
+          gTo: gTo,
+          bFrom: bFrom,
+          bTo: bTo,
+          aFrom: aFrom,
+          aTo: aTo,
+          radiusFrom: radiusFrom,
+          radiusTo: radiusTo,
         });
-
-        particle.tweener
-          .clear()
-          .to({
-            scaleX: sizeTo / particle.width,
-            scaleY: sizeTo / particle.height,
-            rotation: rotationTo,
-            r: rTo,
-            g: gTo,
-            b: bTo,
-            alpha: aTo,
-            posRadius: radiusTo,
-          }, particle.life * 1000)
-          .call(() => {
-            particle.remove();
-            this.particles.push(particle);
-          });
       }
 
       particle.update({ deltaTime: 0 });
-      particle.addChildTo(this.parent);
     },
 
     _static: {

@@ -9,20 +9,18 @@
 </head>
 
 <body style="background:black">
-
   <script src="https://rawgit.com/phinajs/phina.js/develop/build/phina.js"></script>
   <script src="https://rawgit.com/daishihmr/phigl.js/develop/build/phigl.js"></script>
+  <script src="https://rawgit.com/toji/gl-matrix/v2.4.0/dist/gl-matrix.js"></script>
   <script src="../build/phina.particle2dx.js"></script>
-
   <script>
-
   // http://particle2dx.com/
 
   phina.globalize();
   phina.main(() => {
 
     const app = GameApp({
-      fps: 30,
+      fps: 60,
       width: 750,
       height: 1334,
       assets: {
@@ -31,6 +29,7 @@
           "sample2": "galaxy3.png",
           "sample3": "katamari.png",
           "sample4": "me3.png",
+          "bg": "bg.jpg",
         },
         json: {
           // JSONファイル （Corona SDK用にエクスポートしたもの）
@@ -57,35 +56,41 @@
         backgroundColor: "black",
       });
 
+      const layer = ParticleGLLayer({
+        width: 750,
+        height: 1334,
+        originX: 0,
+        originY: 0,
+        x: 0,
+        y: 0,
+        quality: 1 / 4,
+      })
+        .addChildTo(this);
+      layer.blendMode = "lighter";
+
       // パーティクルのエミッター
-      const emitter = Emitter({
+      const emitter = layer.createEmitter({
         jsonName: "sample1",
         textureName: "sample1",
       });
-      emitter.setPosition(this.gridX.span(5), this.gridY.span(5))
-      emitter.addChildTo(this);
+      emitter.setPosition(this.gridX.span(3), this.gridY.span(3));
 
       // 生成開始
       emitter.start();
 
       // 多用は禁物
-      Emitter({ jsonName: "sample2", textureName: "sample2" })
-        .setPosition(this.gridX.span(11), this.gridY.span(5))
-        .addChildTo(this)
+      layer.createEmitter({ jsonName: "sample2", textureName: "sample2" })
+        .setPosition(this.gridX.span(13), this.gridY.span(3))
         .start();
-      Emitter({ jsonName: "sample3", textureName: "sample3" })
-        .setPosition(this.gridX.span(5), this.gridY.span(11))
-        .addChildTo(this)
+      layer.createEmitter({ jsonName: "sample3", textureName: "sample3" })
+        .setPosition(this.gridX.span(3), this.gridY.span(13))
         .start();
-      Emitter({ jsonName: "sample4", textureName: "sample4" })
-        .setPosition(this.gridX.span(11), this.gridY.span(11))
-        .addChildTo(this)
+      layer.createEmitter({ jsonName: "sample4", textureName: "sample4" })
+        .setPosition(this.gridX.span(13), this.gridY.span(13))
         .start();
     },
   });
-
   </script>
-
 </body>
 
 </html>
