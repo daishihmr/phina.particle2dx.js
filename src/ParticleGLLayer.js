@@ -11,7 +11,7 @@ phina.namespace(function() {
 
       this.emitters = [];
 
-      this.domElement = document.createElement("canvas");
+      this.domElement = options.domElement || document.createElement("canvas");
       this.domElement.width = this.width * options.quality;
       this.domElement.height = this.height * options.quality;
 
