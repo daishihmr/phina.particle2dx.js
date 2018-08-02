@@ -17,6 +17,7 @@ phina.namespace(function() {
 
       var gl = this.domElement.getContext("webgl") || this.domElement.getContext("experimental-webgl");
 
+      gl.viewport(0, 0, this.domElement.width, this.domElement.height);
       gl.clearColor(0.0, 0.0, 0.0, 0.0);
       gl.enable(gl.BLEND);
       gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE, gl.ONE, gl.ONE);
